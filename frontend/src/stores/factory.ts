@@ -36,7 +36,14 @@ export function createEntityStore() {
       try {
         await request<DomainRecord>(`/${path}/${item.id}/transition`, { method: 'POST', body: JSON.stringify({ status, expectedVersion: item.version, reason: '前端工作台人工确认' }) });
         await get().load(path);
-      } catch (error) { set({ error: error instanceof Error ? error.message : String(error), loading: false }); throw error; }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // Reload even on rejection so server-side outcomes (e.g. persisted
+        // evidence block reasons) are readable without a manual refresh.
+        await get().load(path);
+        set({ error: message, loading: false });
+        throw error;
+      }
     },
   }));
 }

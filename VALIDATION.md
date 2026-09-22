@@ -1,6 +1,6 @@
 # 验证记录
 
-验证日期：2026-08-22（Asia/Shanghai）
+验证日期：2026-09-22（Asia/Shanghai）
 
 ## 代码质量
 
@@ -25,6 +25,18 @@ docker compose config --quiet
 - 非测试 Go 代码：3239 行。
 - 非测试 `.go` 文件：38 个。
 - 服务层回归测试覆盖证书异人发布、放行双人复核、operator 越权、同人伪装 reviewer、复核后编辑锁定、版本与审计数量。
+- `internal/service/evidence_freeze_test.go` 覆盖证据冻结：提交时冻结检查任务/证书两端版本并写入版本快照；无关联编号、检查未通过、证书无效、完全无证据四种阻断均保持草案且阻断编号刷新可回读；批准前检查任务或证书版本漂移返回 `INSPECTION_VERSION_CHANGED`/`CERTIFICATE_VERSION_CHANGED` 且记录保持 review；退回草案清除冻结、重新提交冻结新版本后双人复核批准成功；批准后证据继续变化不影响已冻结证据，已批准记录拒绝改写。
+
+## 本地 SQLite 端到端（2026-09-22）
+
+使用 SQLite 开发模式实际启动服务（`DATABASE_DRIVER=sqlite REDIS_ADDR=''`），通过 API 验证：
+
+- 检查任务 planned→running→passed（v3）、证书 draft→valid（v2，reviewer 发布）。
+- 无关联编号或证据不全的放行提交返回 HTTP 409 `evidence_blocked`，记录保持 draft/v1，GET 回读 `evidenceConsistent=false`、阻断编号与中文原因。
+- 证据齐全的放行提交冻结 `INSP/CERT` 编号与版本（3/2），版本快照含冻结字段，列表与详情均可读。
+- 提交后检查任务更新到 v4，reviewer 批准返回 HTTP 409 与 `INSPECTION_VERSION_CHANGED`（含冻结/当前版本），记录保持 review/v2，GET 回读当前 v4、冻结 v3、不一致。
+- reviewer 退回 draft（冻结清除，v3）→ operator 重新提交（冻结 v4，v4）→ reviewer 批准（approved v5，双人复核成立）。
+- 批准后底层检查任务再次更新，已批准记录仍保留冻结 v3，PUT 改写返回 HTTP 409。
 
 ## 空卷 Compose 与 API
 

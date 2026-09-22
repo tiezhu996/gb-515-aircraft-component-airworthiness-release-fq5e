@@ -165,10 +165,10 @@ func seedInspectionTask(ctx context.Context, db *gorm.DB) error {
 			Category: "常规", RiskLevel: "low", MetricValue: 12.5, MetricUnit: "unit",
 			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-01"},
 
-		{BaseModel: model.BaseModel{Code: "IT-002", Name: "检查任务示例二", Status: "running", Version: 1,
+		{BaseModel: model.BaseModel{Code: "IT-002", Name: "检查任务示例二", Status: "passed", Version: 2,
 			Description: "用于启动验证和主要流程演示的检查任务记录"}, Facility: "航空部件适航放行区域2", Owner: "质量复核组",
 			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
-			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-02"},
+			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成检查并通过", RelatedCode: "REL-515-02"},
 
 		{BaseModel: model.BaseModel{Code: "IT-003", Name: "检查任务示例三", Status: "passed", Version: 1,
 			Description: "用于启动验证和主要流程演示的检查任务记录"}, Facility: "航空部件适航放行区域3", Owner: "安全主管组",
@@ -196,10 +196,10 @@ func seedCertificateRecord(ctx context.Context, db *gorm.DB) error {
 			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
 			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-02", PreparedBy: "operator", VerifiedBy: "reviewer"},
 
-		{BaseModel: model.BaseModel{Code: "CR-003", Name: "证书记录示例三", Status: "expired", Version: 1,
+		{BaseModel: model.BaseModel{Code: "CR-003", Name: "证书记录示例三", Status: "valid", Version: 2,
 			Description: "用于启动验证和主要流程演示的证书记录记录"}, Facility: "航空部件适航放行区域3", Owner: "安全主管组",
 			Category: "复核", RiskLevel: "high", MetricValue: 37.5, MetricUnit: "score",
-			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-03", PreparedBy: "operator", VerifiedBy: "reviewer"},
+			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成证书复核并发布", RelatedCode: "REL-515-03", PreparedBy: "operator", VerifiedBy: "reviewer"},
 	}
 	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&items).Error; err != nil {
@@ -230,28 +230,43 @@ func seedReleaseAuthorization(ctx context.Context, db *gorm.DB) error {
 			Category: "常规", RiskLevel: "low", MetricValue: 12.5, MetricUnit: "unit",
 			EffectiveAt: now.Add(0 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-01"},
 
-		{BaseModel: model.BaseModel{Code: "RA-002", Name: "放行授权示例二", Status: "review", Version: 1,
+		{BaseModel: model.BaseModel{Code: "RA-002", Name: "放行授权示例二", Status: "review", Version: 2,
 			Description: "用于启动验证和主要流程演示的放行授权记录"}, Facility: "航空部件适航放行区域2", Owner: "质量复核组",
 			Category: "重点", RiskLevel: "medium", MetricValue: 25.0, MetricUnit: "%",
-			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-02", SubmittedBy: "operator"},
+			EffectiveAt: now.Add(3 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-02",
+			SubmittedBy:          "operator",
+			FrozenInspectionCode: "IT-002", FrozenInspectionVersion: 2,
+			FrozenCertificateCode: "CR-002", FrozenCertificateVersion: 1},
 
 		{BaseModel: model.BaseModel{Code: "RA-003", Name: "放行授权示例三", Status: "approved", Version: 1,
 			Description: "用于启动验证和主要流程演示的放行授权记录"}, Facility: "航空部件适航放行区域3", Owner: "安全主管组",
 			Category: "复核", RiskLevel: "high", MetricValue: 37.5, MetricUnit: "score",
-			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-03", SubmittedBy: "operator", ReviewedBy: "reviewer", ReviewReason: "演示数据双人复核通过"},
+			EffectiveAt: now.Add(6 * time.Hour), Evidence: "已完成基础证据核对", RelatedCode: "REL-515-03", SubmittedBy: "operator", ReviewedBy: "reviewer", ReviewReason: "演示数据双人复核通过",
+			FrozenInspectionCode: "IT-003", FrozenInspectionVersion: 1,
+			FrozenCertificateCode: "CR-003", FrozenCertificateVersion: 1},
 	}
 	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&items).Error; err != nil {
 			return err
 		}
-		revisions := make([]model.ReleaseAuthorizationRevision, 0, len(items))
+		revisions := make([]model.ReleaseAuthorizationRevision, 0, len(items)+1)
 		for _, item := range items {
 			revisions = append(revisions, model.ReleaseAuthorizationRevision{
 				ReleaseAuthorizationID: item.ID, Version: item.Version, Status: item.Status,
 				Evidence: item.Evidence, Actor: "system-seed", RequestID: "seed-gb-515",
-				Action: "seed", Reason: "initial demonstration authorization", CreatedAt: now,
+				Action: "seed", Reason: "initial demonstration authorization",
+				FrozenInspectionCode: item.FrozenInspectionCode, FrozenInspectionVersion: item.FrozenInspectionVersion,
+				FrozenCertificateCode: item.FrozenCertificateCode, FrozenCertificateVersion: item.FrozenCertificateVersion,
+				CreatedAt: now,
 			})
 		}
+		reviewItem := items[1]
+		revisions = append(revisions, model.ReleaseAuthorizationRevision{
+			ReleaseAuthorizationID: reviewItem.ID, Version: reviewItem.Version - 1, Status: "draft",
+			Evidence: reviewItem.Evidence, Actor: "system-seed", RequestID: "seed-gb-515",
+			Action: "seed", Reason: "initial demonstration authorization",
+			CreatedAt: now.Add(-time.Minute),
+		})
 		return tx.Create(&revisions).Error
 	})
 }

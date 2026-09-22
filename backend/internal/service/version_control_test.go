@@ -58,7 +58,11 @@ func TestCertificateVersionChainRequiresIndependentReviewer(t *testing.T) {
 
 func TestAuthorizationVersionChainEnforcesDualControl(t *testing.T) {
 	db := newVersionTestDB(t)
-	service := NewReleaseAuthorizationService(repository.NewReleaseAuthorizationRepository(db), nil)
+	seedAuthorizationEvidence(t, db, "PART-101", 1, "passed", 1, "valid")
+	service := NewReleaseAuthorizationService(
+		repository.NewReleaseAuthorizationRepository(db),
+		repository.NewInspectionTaskRepository(db),
+		repository.NewCertificateRecordRepository(db), nil)
 	ctx := context.Background()
 
 	created, err := service.Create(ctx, authorizationInput("AUTH-TEST-01"), "operator", "auth-create-1")
@@ -108,12 +112,42 @@ func newVersionTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("open sqlite: %v", err)
 	}
 	if err := db.AutoMigrate(
-		&model.AuditLog{}, &model.CertificateRecord{}, &model.CertificateRecordRevision{},
+		&model.AuditLog{}, &model.InspectionTask{},
+		&model.CertificateRecord{}, &model.CertificateRecordRevision{},
 		&model.ReleaseAuthorization{}, &model.ReleaseAuthorizationRevision{},
 	); err != nil {
 		t.Fatalf("migrate sqlite: %v", err)
 	}
 	return db
+}
+
+func seedAuthorizationEvidence(t *testing.T, db *gorm.DB, relatedCode string, inspectionVersion uint, inspectionStatus string, certificateVersion uint, certificateStatus string) {
+	t.Helper()
+	now := time.Now().UTC()
+	inspection := model.InspectionTask{
+		BaseModel: model.BaseModel{
+			Code: "INS-" + relatedCode, Name: "Passed inspection", Status: inspectionStatus,
+			Version: inspectionVersion, CreatedAt: now, UpdatedAt: now,
+		},
+		Facility: "Hangar 2", Owner: "Inspection desk", Category: "engine", RiskLevel: "high",
+		MetricValue: 100, MetricUnit: "percent", EffectiveAt: now,
+		Evidence: "inspection report IR-101", RelatedCode: relatedCode,
+	}
+	if err := db.Create(&inspection).Error; err != nil {
+		t.Fatalf("seed inspection: %v", err)
+	}
+	certificate := model.CertificateRecord{
+		BaseModel: model.BaseModel{
+			Code: "CERT-" + relatedCode, Name: "Valid certificate", Status: certificateStatus,
+			Version: certificateVersion, CreatedAt: now, UpdatedAt: now,
+		},
+		Facility: "Hangar 2", Owner: "Certificate desk", Category: "engine", RiskLevel: "high",
+		MetricValue: 100, MetricUnit: "percent", EffectiveAt: now,
+		Evidence: "certificate CERT-101", RelatedCode: relatedCode, PreparedBy: "operator",
+	}
+	if err := db.Create(&certificate).Error; err != nil {
+		t.Fatalf("seed certificate: %v", err)
+	}
 }
 
 func certificateInput(code string) dto.CreateCertificateRecord {

@@ -40,12 +40,14 @@ docker compose down -v --remove-orphans
 
 - JWT 登录和 viewer/operator/reviewer/admin 四级 RBAC，数据库角色、Gin middleware、React 路由守卫和按钮权限一致。
 - 放行必须经过 `draft -> review -> approved/restricted`，提交者与复核者必须是不同账号，operator 无法自批。
+- 证据冻结校验：提交复核时按关联编号查找已通过（passed）检查任务和有效（valid）证书，把两端编号与版本冻结进提交版本；任一缺失或状态不合时保持草案，持久化阻断编号与原因（`EVIDENCE_LINK_MISSING`、`INSPECTION_NOT_PASSED`、`CERTIFICATE_NOT_VALID`），刷新后可回读。
+- 提交后只要检查任务或证书版本/状态变化，批准或限制放行一律拒绝并给出漂移阻断编号（`INSPECTION_VERSION_CHANGED`、`CERTIFICATE_VERSION_CHANGED`），复核员退回草案后重新提交即可重新冻结；证据未变化时仍按双人复核批准。已批准记录永久保留冻结证据，后续更新不得改写。
 - 证书发布同样要求 reviewer/admin，且发布者不能是当前版本的编制人。
 - 证书和授权的每次创建、草稿更新与状态变化都在同一事务写入不可变版本快照和审计日志。
 - 所有状态变化使用乐观锁；复核开始后业务字段锁定，防止覆盖已审证据。
 - 请求 ID、结构化日志、全局错误映射和 Redis 分布式限流。
 - 提供脱敏运行配置、当前会话、审计汇总和单实体审计历史接口。
-- 业务工作台支持查询、新建、状态推进、风险标识及操作审计查看。
+- 业务工作台支持查询、新建、状态推进、风险标识及操作审计查看；放行页额外展示证据冻结版本、当前一致性与阻断原因，可展开查看两端当前版本/状态和历史版本中的冻结证据。
 
 ## 技术栈
 

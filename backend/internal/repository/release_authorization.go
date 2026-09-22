@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/blueship581/aircraft-component-airworthiness-release/backend/internal/dto"
 	"github.com/blueship581/aircraft-component-airworthiness-release/backend/internal/model"
@@ -14,6 +15,7 @@ type ReleaseAuthorizationRepository interface {
 	Get(context.Context, uint) (model.ReleaseAuthorization, error)
 	CreateVersion(context.Context, *model.ReleaseAuthorization, string, string) error
 	UpdateVersion(context.Context, uint, uint, *model.ReleaseAuthorization, string, string, string, string, string) error
+	ApplyEvidenceBlock(context.Context, uint, string, string, string, string) error
 	Delete(context.Context, uint) error
 	CountByStatus(context.Context) (map[string]int64, error)
 }
@@ -66,7 +68,10 @@ func (r *releaseAuthorizationRepository) CreateVersion(ctx context.Context, item
 		revision := model.ReleaseAuthorizationRevision{
 			ReleaseAuthorizationID: item.ID, Version: item.Version, Status: item.Status,
 			Evidence: item.Evidence, Actor: actor, RequestID: requestID, Action: "create",
-			Reason: "authorization drafted", CreatedAt: item.CreatedAt,
+			Reason:               "authorization drafted",
+			FrozenInspectionCode: item.FrozenInspectionCode, FrozenInspectionVersion: item.FrozenInspectionVersion,
+			FrozenCertificateCode: item.FrozenCertificateCode, FrozenCertificateVersion: item.FrozenCertificateVersion,
+			CreatedAt: item.CreatedAt,
 		}
 		if err := tx.Create(&revision).Error; err != nil {
 			return err
@@ -84,12 +89,31 @@ func (r *releaseAuthorizationRepository) UpdateVersion(ctx context.Context, id, 
 		revision := model.ReleaseAuthorizationRevision{
 			ReleaseAuthorizationID: id, Version: item.Version, Status: item.Status,
 			Evidence: item.Evidence, Actor: actor, RequestID: requestID, Action: action,
-			Reason: reason, CreatedAt: item.UpdatedAt,
+			Reason:               reason,
+			FrozenInspectionCode: item.FrozenInspectionCode, FrozenInspectionVersion: item.FrozenInspectionVersion,
+			FrozenCertificateCode: item.FrozenCertificateCode, FrozenCertificateVersion: item.FrozenCertificateVersion,
+			CreatedAt: item.UpdatedAt,
 		}
 		if err := tx.Create(&revision).Error; err != nil {
 			return err
 		}
 		return appendAudit(tx, actor, requestID, action, "ReleaseAuthorization", id, before, item.Status, reason)
+	})
+}
+
+// ApplyEvidenceBlock records why evidence freeze failed without bumping the
+// version: the record keeps its current state and the reason survives refresh.
+func (r *releaseAuthorizationRepository) ApplyEvidenceBlock(ctx context.Context, id uint, actor, requestID, status, reason string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.ReleaseAuthorization{}).Where("id = ?", id).
+			Updates(map[string]any{"evidence_blocked_reason": reason, "updated_at": time.Now().UTC()})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return appendAudit(tx, actor, requestID, "evidence-block", "ReleaseAuthorization", id, status, status, reason)
 	})
 }
 func (r *releaseAuthorizationRepository) Delete(ctx context.Context, id uint) error {

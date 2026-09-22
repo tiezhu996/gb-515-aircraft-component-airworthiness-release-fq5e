@@ -20,6 +20,18 @@ export interface DomainRecord {
 	submittedBy?: string;
 	reviewedBy?: string;
 	reviewReason?: string;
+	frozenInspectionCode?: string;
+	frozenInspectionVersion?: number;
+	frozenCertificateCode?: string;
+	frozenCertificateVersion?: number;
+	evidenceBlockedReason?: string;
+	evidenceConsistent?: boolean | null;
+	evidenceBlockCode?: string;
+	evidenceBlockReason?: string;
+	currentInspectionVersion?: number;
+	currentInspectionStatus?: string;
+	currentCertificateVersion?: number;
+	currentCertificateStatus?: string;
 	revisions?: VersionRevision[];
 	createdAt: string;
 	updatedAt: string;
@@ -34,6 +46,10 @@ export interface VersionRevision {
   requestId: string;
   action: string;
   reason: string;
+  frozenInspectionCode?: string;
+  frozenInspectionVersion?: number;
+  frozenCertificateCode?: string;
+  frozenCertificateVersion?: number;
   createdAt: string;
 }
 
