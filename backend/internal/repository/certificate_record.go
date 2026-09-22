@@ -16,6 +16,9 @@ type CertificateRecordRepository interface {
 	UpdateVersion(context.Context, uint, uint, *model.CertificateRecord, string, string, string, string, string) error
 	Delete(context.Context, uint) error
 	CountByStatus(context.Context) (map[string]int64, error)
+	// LatestByRelatedCodes returns the most recently updated certificate for
+	// each provided 关联编号.
+	LatestByRelatedCodes(context.Context, []string) (map[string]model.CertificateRecord, error)
 }
 
 type certificateRecordRepository struct {
@@ -97,4 +100,22 @@ func (r *certificateRecordRepository) Delete(ctx context.Context, id uint) error
 }
 func (r *certificateRecordRepository) CountByStatus(ctx context.Context) (map[string]int64, error) {
 	return r.store.CountByStatus(ctx)
+}
+
+func (r *certificateRecordRepository) LatestByRelatedCodes(ctx context.Context, relatedCodes []string) (map[string]model.CertificateRecord, error) {
+	latest := make(map[string]model.CertificateRecord)
+	codes := normalizeRelatedCodes(relatedCodes)
+	if len(codes) == 0 {
+		return latest, nil
+	}
+	var records []model.CertificateRecord
+	if err := r.store.ListByRelatedCodes(ctx, codes, &records); err != nil {
+		return nil, err
+	}
+	for _, record := range records {
+		if existing, ok := latest[record.RelatedCode]; !ok || record.UpdatedAt.After(existing.UpdatedAt) {
+			latest[record.RelatedCode] = record
+		}
+	}
+	return latest, nil
 }

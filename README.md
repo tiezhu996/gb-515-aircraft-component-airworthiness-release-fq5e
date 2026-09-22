@@ -40,6 +40,9 @@ docker compose down -v --remove-orphans
 
 - JWT 登录和 viewer/operator/reviewer/admin 四级 RBAC，数据库角色、Gin middleware、React 路由守卫和按钮权限一致。
 - 放行必须经过 `draft -> review -> approved/restricted`，提交者与复核者必须是不同账号，operator 无法自批。
+- 放行草稿提交复核时执行证据冻结：按 `relatedCode` 查找已通过（`passed`）检查任务和有效（`valid`）证书，把两端编号与版本写入提交快照；任一缺失或状态不合则保持草案，返回阻断编号（`EVIDENCE-*`）。
+- 提交后检查任务或证书版本变化时批准/受限批准一律拒绝（`evidence_drifted`，阻断编号 `DRIFT-*`）并要求退回草案重新提交；未变化时仍按双人复核批准。已批准记录保留当时冻结证据，后续更新不得改写。
+- 放行页只读展示关联编号、检查任务/证书的冻结版本与当前版本、当前是否一致以及阻断原因，全部来自 API，刷新后可回读。
 - 证书发布同样要求 reviewer/admin，且发布者不能是当前版本的编制人。
 - 证书和授权的每次创建、草稿更新与状态变化都在同一事务写入不可变版本快照和审计日志。
 - 所有状态变化使用乐观锁；复核开始后业务字段锁定，防止覆盖已审证据。

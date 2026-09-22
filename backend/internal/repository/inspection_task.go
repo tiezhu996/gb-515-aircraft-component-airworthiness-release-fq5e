@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 
 	"github.com/blueship581/aircraft-component-airworthiness-release/backend/internal/dto"
 	"github.com/blueship581/aircraft-component-airworthiness-release/backend/internal/model"
@@ -16,6 +17,9 @@ type InspectionTaskRepository interface {
 	Update(context.Context, uint, uint, *model.InspectionTask) error
 	Delete(context.Context, uint) error
 	CountByStatus(context.Context) (map[string]int64, error)
+	// LatestByRelatedCodes returns the most recently updated inspection task
+	// for each provided 关联编号.
+	LatestByRelatedCodes(context.Context, []string) (map[string]model.InspectionTask, error)
 }
 
 type inspectionTaskRepository struct {
@@ -43,4 +47,37 @@ func (r *inspectionTaskRepository) Delete(ctx context.Context, id uint) error {
 }
 func (r *inspectionTaskRepository) CountByStatus(ctx context.Context) (map[string]int64, error) {
 	return r.store.CountByStatus(ctx)
+}
+
+func (r *inspectionTaskRepository) LatestByRelatedCodes(ctx context.Context, relatedCodes []string) (map[string]model.InspectionTask, error) {
+	latest := make(map[string]model.InspectionTask)
+	codes := normalizeRelatedCodes(relatedCodes)
+	if len(codes) == 0 {
+		return latest, nil
+	}
+	var tasks []model.InspectionTask
+	if err := r.store.ListByRelatedCodes(ctx, codes, &tasks); err != nil {
+		return nil, err
+	}
+	for _, task := range tasks {
+		if existing, ok := latest[task.RelatedCode]; !ok || task.UpdatedAt.After(existing.UpdatedAt) {
+			latest[task.RelatedCode] = task
+		}
+	}
+	return latest, nil
+}
+
+// normalizeRelatedCodes uppercases, trims and deduplicates 关联编号 values.
+func normalizeRelatedCodes(relatedCodes []string) []string {
+	seen := make(map[string]bool, len(relatedCodes))
+	codes := make([]string, 0, len(relatedCodes))
+	for _, raw := range relatedCodes {
+		code := strings.ToUpper(strings.TrimSpace(raw))
+		if code == "" || seen[code] {
+			continue
+		}
+		seen[code] = true
+		codes = append(codes, code)
+	}
+	return codes
 }

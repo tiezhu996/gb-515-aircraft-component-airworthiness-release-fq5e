@@ -12,6 +12,22 @@ import (
 )
 
 func handleError(c *gin.Context, err error) {
+	var evidenceErr *service.EvidenceValidationError
+	if errors.As(err, &evidenceErr) {
+		switch {
+		case errors.Is(err, service.ErrEvidenceBlocked):
+			util.FailWithDetails(c, http.StatusUnprocessableEntity, "evidence_blocked", evidenceErr.Error(), gin.H{
+				"blockCode":   evidenceErr.BlockCode,
+				"blockReason": evidenceErr.Reason,
+			})
+		case errors.Is(err, service.ErrEvidenceDrift):
+			util.FailWithDetails(c, http.StatusConflict, "evidence_drifted", evidenceErr.Error(), gin.H{
+				"blockCode":   evidenceErr.BlockCode,
+				"blockReason": evidenceErr.Reason,
+			})
+		}
+		return
+	}
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		util.Fail(c, http.StatusNotFound, "not_found", "record was not found")

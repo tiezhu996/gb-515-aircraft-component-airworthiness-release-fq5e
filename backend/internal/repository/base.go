@@ -54,6 +54,18 @@ func (s *Store[T]) Get(ctx context.Context, id uint) (T, error) {
 	return item, err
 }
 
+// ListByRelatedCodes loads every non-deleted record whose 关联编号 is in the
+// provided set, newest first. Callers pick the latest record per code.
+func (s *Store[T]) ListByRelatedCodes(ctx context.Context, relatedCodes []string, items *[]T) error {
+	if len(relatedCodes) == 0 {
+		return nil
+	}
+	return s.db.WithContext(ctx).
+		Where("related_code IN ?", relatedCodes).
+		Order("updated_at DESC, id DESC").
+		Find(items).Error
+}
+
 func (s *Store[T]) Create(ctx context.Context, item *T) error {
 	return s.db.WithContext(ctx).Create(item).Error
 }

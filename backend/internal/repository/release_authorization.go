@@ -85,6 +85,8 @@ func (r *releaseAuthorizationRepository) UpdateVersion(ctx context.Context, id, 
 			ReleaseAuthorizationID: id, Version: item.Version, Status: item.Status,
 			Evidence: item.Evidence, Actor: actor, RequestID: requestID, Action: action,
 			Reason: reason, CreatedAt: item.UpdatedAt,
+			FrozenInspectionCode: item.FrozenInspectionCode, FrozenInspectionVersion: item.FrozenInspectionVersion,
+			FrozenCertificateCode: item.FrozenCertificateCode, FrozenCertificateVersion: item.FrozenCertificateVersion,
 		}
 		if err := tx.Create(&revision).Error; err != nil {
 			return err

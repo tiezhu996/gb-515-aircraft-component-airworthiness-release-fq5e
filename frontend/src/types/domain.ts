@@ -1,4 +1,19 @@
 
+export interface EvidenceFreezeStatus {
+  relatedCode: string;
+  inspectionCode?: string;
+  inspectionStatus?: string;
+  frozenInspectionVersion?: number;
+  currentInspectionVersion?: number;
+  certificateCode?: string;
+  certificateStatus?: string;
+  frozenCertificateVersion?: number;
+  currentCertificateVersion?: number;
+  consistent: boolean;
+  blockCode?: string;
+  blockReason?: string;
+}
+
 export interface DomainRecord {
   id: number;
   code: string;
@@ -20,9 +35,19 @@ export interface DomainRecord {
 	submittedBy?: string;
 	reviewedBy?: string;
 	reviewReason?: string;
+	frozenInspectionCode?: string;
+	frozenInspectionVersion?: number;
+	frozenCertificateCode?: string;
+	frozenCertificateVersion?: number;
+	evidenceStatus?: EvidenceFreezeStatus;
 	revisions?: VersionRevision[];
 	createdAt: string;
 	updatedAt: string;
+}
+
+export interface ApiErrorDetails {
+  blockCode?: string;
+  blockReason?: string;
 }
 
 export interface VersionRevision {
